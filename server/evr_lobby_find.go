@@ -441,16 +441,11 @@ func (p *EvrPipeline) newLobby(ctx context.Context, logger *zap.Logger, lobbyPar
 
 	p.nk.metrics.CustomCounter("lobby_new", metricsTags, 1)
 
-	groupID := lobbyParams.GroupID
-	if lobbyParams.Mode == evr.ModeArenaPublic || lobbyParams.Mode == evr.ModeCombatPublic || lobbyParams.Mode == evr.ModeSocialPublic {
-		groupID = uuid.Nil
-	}
-
 	settings := &MatchSettings{
 		Mode:                lobbyParams.Mode,
 		Level:               lobbyParams.Level,
 		SpawnedBy:           lobbyParams.UserID.String(),
-		GroupID:             groupID,
+		GroupID:             lobbyParams.GroupID,
 		StartTime:           time.Now().UTC(),
 		Reservations:        entrants,
 		ReservationLifetime: 30 * time.Second,
@@ -770,6 +765,7 @@ func (p *EvrPipeline) isLeaderHeadingToSocial(ctx context.Context, logger *zap.L
 func PrepareEntrantPresences(ctx context.Context, logger *zap.Logger, nk runtime.NakamaModule, sessionRegistry SessionRegistry, lobbyParams *LobbySessionParameters, sessionIDs ...uuid.UUID) ([]*EvrMatchPresence, error) {
 
 	entrantPresences := make([]*EvrMatchPresence, 0, len(sessionIDs))
+	groupID := lobbyParams.GroupID
 	for _, sessionID := range sessionIDs {
 		session := sessionRegistry.Get(sessionID)
 		if session == nil {
@@ -781,13 +777,13 @@ func PrepareEntrantPresences(ctx context.Context, logger *zap.Logger, nk runtime
 			mmMode = evr.ModeArenaPublic
 		}
 
-		rating, err := MatchmakingRatingLoad(ctx, nk, session.UserID().String(), lobbyParams.GroupID.String(), mmMode)
+		rating, err := MatchmakingRatingLoad(ctx, nk, session.UserID().String(), groupID.String(), mmMode)
 		if err != nil {
 			logger.Warn("Failed to load rating", zap.String("sid", sessionID.String()), zap.Error(err))
 			rating = NewDefaultRating()
 		}
 
-		presence, err := EntrantPresenceFromSession(session, lobbyParams.PartyID, lobbyParams.Role, rating, lobbyParams.GroupID.String(), 0, "")
+		presence, err := EntrantPresenceFromSession(session, lobbyParams.PartyID, lobbyParams.Role, rating, groupID.String(), 0, "")
 		if err != nil {
 			logger.Warn("Failed to create entrant presence", zap.String("session_id", session.ID().String()), zap.Error(err))
 			continue

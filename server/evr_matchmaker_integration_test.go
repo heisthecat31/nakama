@@ -874,10 +874,9 @@ func TestUndersizedMatch_Combat1v1AllowedAfterFailsafe(t *testing.T) {
 	}
 }
 
-// TestPublicMatchmaker_CrossGuildPairing verifies that public matchmaking
-// (echo_arena) correctly pairs players from different social lobbies (guilds).
-// This confirms the fix for the "Island Matchmaking" bug.
-func TestPublicMatchmaker_CrossGuildPairing(t *testing.T) {
+// TestGuildIsolation verifies that players from different guilds
+// (social lobbies) are isolated into separate matchmaking pools.
+func TestGuildIsolation(t *testing.T) {
 	logger := loggerForTest(t)
 	matchmaker, cleanup := createProcessorTestMatchmaker(t, logger)
 	defer cleanup()
@@ -897,35 +896,35 @@ func TestPublicMatchmaker_CrossGuildPairing(t *testing.T) {
 			"group_id":  "guild-b-id",
 		}, nil)
 
-	// Add 6 more players in Guild C to make a full match
-	for i := range 6 {
-		addIntegrationProcessorTicketWithProps(t, matchmaker, fmt.Sprintf("player-guild-c-%d", i),
+	// Even if they both want Arena, they should NOT match.
+	matched, _ := runProcessorCycle(matchmaker)
+	if len(matched) != 0 {
+		t.Fatalf("expected 0 matches (guild isolation), got %d", len(matched))
+	}
+
+	// Add 7 more players to Guild A (total 8)
+	for i := range 7 {
+		addIntegrationProcessorTicketWithProps(t, matchmaker, fmt.Sprintf("player-guild-a-%d", i),
 			map[string]string{
 				"game_mode": "echo_arena",
-				"group_id":  "guild-c-id",
+				"group_id":  "guild-a-id",
 			}, nil)
 	}
 
-	matched, _ := runProcessorCycle(matchmaker)
+	// Now Guild A should have a full match, but Player B should still be alone.
+	matched, _ = runProcessorCycle(matchmaker)
 	if len(matched) != 1 {
-		t.Fatalf("expected 1 match (cross-guild), got %d", len(matched))
+		t.Fatalf("expected 1 match (Guild A full), got %d", len(matched))
 	}
 	if len(matched[0]) != 8 {
 		t.Fatalf("expected 8 players, got %d", len(matched[0]))
 	}
 
-	// Verify both players from different guilds are in the match
-	var foundA, foundB bool
+	// Verify all players in the match are from Guild A
 	for _, entry := range matched[0] {
-		if entry.StringProperties["group_id"] == "guild-a-id" {
-			foundA = true
+		if entry.GetProperties()["group_id"] != "guild-a-id" {
+			t.Fatalf("match contains player from wrong guild: %s", entry.GetProperties()["group_id"])
 		}
-		if entry.StringProperties["group_id"] == "guild-b-id" {
-			foundB = true
-		}
-	}
-	if !foundA || !foundB {
-		t.Fatalf("match missing players from different guilds: foundA=%v, foundB=%v", foundA, foundB)
 	}
 }
 
@@ -939,7 +938,7 @@ func TestUndersizedMatch_Combat1v1WithExpiredFailsafe(t *testing.T) {
 
 	for i := range 2 {
 		addIntegrationProcessorTicketWithProps(t, matchmaker, fmt.Sprintf("combat1v1-expired-%02d", i),
-			map[string]string{"game_mode": "echo_combat"},
+			map[string]string{"game_mode": "echo_combat", "group_id": "guild-id"},
 			map[string]float64{
 				"failsafe_timeout": 0,
 				"min_team_size":    3,
@@ -956,31 +955,5 @@ func TestUndersizedMatch_Combat1v1WithExpiredFailsafe(t *testing.T) {
 	}
 	if len(matched[0]) != 2 {
 		t.Fatalf("expected 2 players, got %d", len(matched[0]))
-	}
-}
-
-func TestIntegrationProcessorCrossGuildPublicMatchmaking(t *testing.T) {
-	logger := loggerForTest(t)
-	matchmaker, cleanup := createProcessorTestMatchmaker(t, logger)
-	defer cleanup()
-	wireEvrProcessor(matchmaker, NewRuntimeGoLogger(logger))
-
-	addIntegrationProcessorTicketWithProps(t, matchmaker, "guildA", map[string]string{
-		"game_mode": "echo_combat",
-		"group_id":  "guild-A",
-	}, map[string]float64{
-		"timestamp": float64(time.Now().UTC().Unix()),
-	})
-
-	addIntegrationProcessorTicketWithProps(t, matchmaker, "guildB", map[string]string{
-		"game_mode": "echo_combat",
-		"group_id":  "guild-B",
-	}, map[string]float64{
-		"timestamp": float64(time.Now().UTC().Unix()),
-	})
-
-	matched, _ := runProcessorCycle(matchmaker)
-	if len(matched) != 1 {
-		t.Fatalf("expected 1 match (cross-guild players should match in public mode), got %d", len(matched))
 	}
 }

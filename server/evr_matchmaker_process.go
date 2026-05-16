@@ -2,6 +2,7 @@ package server
 
 import (
 	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -377,8 +378,9 @@ func isUndersizedMatch(candidate []runtime.MatchmakerEntry) bool {
 	// Tiered Reasonable Timeouts (bypass minMatchSize for these checks)
 	if len(candidate) < 8 {
 		modestr, _ := candidate[0].GetProperties()["game_mode"].(string)
-		isCombat := modestr == evr.ModeCombatPublic.String()
-		isArenaOrSocial := modestr == evr.ModeArenaPublic.String() || modestr == evr.ModeSocialPublic.String()
+		mode := evr.ToSymbol(modestr)
+		isCombat := mode == evr.ModeCombatPublic
+		isArenaOrSocial := slices.Contains(evr.PublicModes, mode)
 
 		if isCombat {
 			if now-oldestTimestamp < 60 {

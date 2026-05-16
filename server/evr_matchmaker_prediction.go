@@ -270,8 +270,8 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 
 			// Collect tickets efficiently - group entries by ticket
 			modestr, _ := candidate[0].GetProperties()["game_mode"].(string)
-			isCombat := modestr == evr.ModeCombatPublic.String()
-			isPublic := modestr == evr.ModeArenaPublic.String() || modestr == evr.ModeCombatPublic.String() || modestr == evr.ModeSocialPublic.String()
+			mode := evr.ToSymbol(modestr)
+			isCombat := mode == evr.ModeCombatPublic
 
 			for _, entry := range candidate {
 				ticket := entry.GetTicket()
@@ -332,7 +332,7 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 			}
 			for _, g := range groups {
 				ticket := g[0].GetTicket()
-				if isPublic {
+				if isCombat {
 					ticket = g[0].GetPresence().GetUserId()
 				}
 				maps.Copy(divs, ticketDivs[ticket])

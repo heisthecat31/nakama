@@ -592,7 +592,7 @@ func (p *LobbySessionParameters) BackfillSearchQuery(includeMMR bool, includeMax
 
 	minStartTime := p.MatchmakingTimestamp.UTC().Add(-time.Duration(MatchStartTimeMinimumAgeSecs) * time.Second).Format(time.RFC3339Nano)
 
-	groupID := p.GetMatchmakingGroupID()
+	groupID := p.GroupID
 	qparts := []string{
 		"+label.open:T",
 		fmt.Sprintf("+label.mode:%s", p.Mode.String()),
@@ -741,7 +741,7 @@ func (p *LobbySessionParameters) FromMatchmakerEntry(entry *MatchmakerEntry) {
 
 func (p *LobbySessionParameters) MatchmakingParameters(ticketParams *MatchmakingTicketParameters) (string, map[string]string, map[string]float64) {
 
-	groupID := p.GetMatchmakingGroupID()
+	groupID := p.GroupID
 	submissionTime := p.MatchmakingTimestamp.UTC().Format(time.RFC3339)
 	stringProperties := map[string]string{
 		"game_mode":              p.Mode.String(),
@@ -877,19 +877,13 @@ func (p *LobbySessionParameters) MatchmakingParameters(ticketParams *Matchmaking
 }
 
 func (p LobbySessionParameters) MatchmakingStream() PresenceStream {
-	return PresenceStream{Mode: StreamModeMatchmaking, Subject: p.GetMatchmakingGroupID()}
+	return PresenceStream{Mode: StreamModeMatchmaking, Subject: p.GroupID}
 }
 
 func (p LobbySessionParameters) GuildGroupStream() PresenceStream {
-	return PresenceStream{Mode: StreamModeGuildGroup, Subject: p.GetMatchmakingGroupID(), Label: p.Mode.String()}
+	return PresenceStream{Mode: StreamModeGuildGroup, Subject: p.GroupID, Label: p.Mode.String()}
 }
 
-func (p LobbySessionParameters) GetMatchmakingGroupID() uuid.UUID {
-	if p.Mode == evr.ModeArenaPublic || p.Mode == evr.ModeCombatPublic || p.Mode == evr.ModeSocialPublic {
-		return uuid.Nil
-	}
-	return p.GroupID
-}
 
 func (p LobbySessionParameters) PresenceMeta() PresenceMeta {
 	return PresenceMeta{
