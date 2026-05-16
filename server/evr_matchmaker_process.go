@@ -361,11 +361,6 @@ func isUndersizedMatch(candidate []runtime.MatchmakerEntry) bool {
 		minTeamSize = 4.0
 	}
 
-	minMatchSize := int(minTeamSize) * 2
-	if len(candidate) >= minMatchSize {
-		return false
-	}
-
 	failsafeTimeout, _ := candidate[0].GetProperties()["failsafe_timeout"].(float64)
 	if failsafeTimeout <= 0 {
 		return false
@@ -379,16 +374,36 @@ func isUndersizedMatch(candidate []runtime.MatchmakerEntry) bool {
 		}
 	}
 
-	// For public matches smaller than a 4v4, enforce a 60-second minimum wait
-	// to allow more players to join, regardless of the failsafe timeout.
-	// This is bypassed if the failsafe is explicitly set to zero (e.g. in tests).
+	// Tiered Reasonable Timeouts (bypass minMatchSize for these checks)
 	if len(candidate) < 8 {
 		modestr, _ := candidate[0].GetProperties()["game_mode"].(string)
-		if modestr == evr.ModeArenaPublic.String() || modestr == evr.ModeCombatPublic.String() || modestr == evr.ModeSocialPublic.String() {
+		isCombat := modestr == evr.ModeCombatPublic.String()
+		isArenaOrSocial := modestr == evr.ModeArenaPublic.String() || modestr == evr.ModeSocialPublic.String()
+
+		if isCombat {
 			if now-oldestTimestamp < 60 {
-				return true
+				return true // Wait 60s
 			}
+			return false // Allow any size after 60s
 		}
+		if isArenaOrSocial {
+			if len(candidate) >= 4 {
+				if now-oldestTimestamp < 60 {
+					return true // Wait 60s for 2v2 or 3v3
+				}
+				return false // Allow 2v2+ after 60s
+			}
+			// 1v1 path for Arena/Social
+			if now-oldestTimestamp < failsafeTimeout {
+				return true // Wait full 5m
+			}
+			return false // Allow 1v1 after 5m
+		}
+	}
+
+	minMatchSize := int(minTeamSize) * 2
+	if len(candidate) >= minMatchSize {
+		return false
 	}
 
 	if now-oldestTimestamp >= failsafeTimeout {

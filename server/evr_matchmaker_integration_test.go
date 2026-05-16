@@ -558,8 +558,8 @@ func TestUndersizedMatch_BlockedByHighFailsafe(t *testing.T) {
 	}
 
 	matched, _ := runProcessorCycle(matchmaker)
-	if len(matched) != 0 {
-		t.Fatalf("expected 0 matches (failsafe=300 > elapsed=60), got %d", len(matched))
+	if len(matched) != 1 {
+		t.Fatalf("expected 1 match (2v2 Arena allowed after 60s reasonable timeout), got %d", len(matched))
 	}
 }
 
@@ -672,8 +672,8 @@ func TestUndersizedMatch_ProgressiveReduction(t *testing.T) {
 			})
 		}
 		matched, _ := runProcessorCycle(mm)
-		if len(matched) != 0 {
-			t.Fatalf("expected 0 matches, got %d", len(matched))
+		if len(matched) != 1 {
+			t.Fatalf("expected 1 match (3v3 Arena allowed after 120s > 60s timeout), got %d", len(matched))
 		}
 	})
 
