@@ -270,7 +270,6 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 
 			// Collect tickets efficiently - group entries by ticket
 			modestr, _ := candidate[0].GetProperties()["game_mode"].(string)
-			isCombat := modestr == evr.ModeCombatPublic.String()
 			isPublic := modestr == evr.ModeArenaPublic.String() || modestr == evr.ModeCombatPublic.String() || modestr == evr.ModeSocialPublic.String()
 
 			for _, entry := range candidate {
@@ -376,7 +375,7 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 					// - 8th → Blue
 					for idx, g := range groups {
 						ticket := g[0].GetTicket()
-						if isCombat {
+						if isPublic {
 							ticket = g[0].GetPresence().GetUserId()
 						}
 
