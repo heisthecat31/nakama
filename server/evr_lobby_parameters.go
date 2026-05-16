@@ -882,7 +882,6 @@ func (p LobbySessionParameters) GuildGroupStream() PresenceStream {
 	return PresenceStream{Mode: StreamModeGuildGroup, Subject: p.GroupID, Label: p.Mode.String()}
 }
 
-
 func (p LobbySessionParameters) PresenceMeta() PresenceMeta {
 	return PresenceMeta{
 		Status: p.String(),
