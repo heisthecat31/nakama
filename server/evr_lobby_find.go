@@ -765,7 +765,6 @@ func (p *EvrPipeline) isLeaderHeadingToSocial(ctx context.Context, logger *zap.L
 func PrepareEntrantPresences(ctx context.Context, logger *zap.Logger, nk runtime.NakamaModule, sessionRegistry SessionRegistry, lobbyParams *LobbySessionParameters, sessionIDs ...uuid.UUID) ([]*EvrMatchPresence, error) {
 
 	entrantPresences := make([]*EvrMatchPresence, 0, len(sessionIDs))
-	groupID := lobbyParams.GroupID
 	for _, sessionID := range sessionIDs {
 		session := sessionRegistry.Get(sessionID)
 		if session == nil {
@@ -777,13 +776,13 @@ func PrepareEntrantPresences(ctx context.Context, logger *zap.Logger, nk runtime
 			mmMode = evr.ModeArenaPublic
 		}
 
-		rating, err := MatchmakingRatingLoad(ctx, nk, session.UserID().String(), groupID.String(), mmMode)
+		rating, err := MatchmakingRatingLoad(ctx, nk, session.UserID().String(), lobbyParams.GroupID.String(), mmMode)
 		if err != nil {
 			logger.Warn("Failed to load rating", zap.String("sid", sessionID.String()), zap.Error(err))
 			rating = NewDefaultRating()
 		}
 
-		presence, err := EntrantPresenceFromSession(session, lobbyParams.PartyID, lobbyParams.Role, rating, groupID.String(), 0, "")
+		presence, err := EntrantPresenceFromSession(session, lobbyParams.PartyID, lobbyParams.Role, rating, lobbyParams.GroupID.String(), 0, "")
 		if err != nil {
 			logger.Warn("Failed to create entrant presence", zap.String("session_id", session.ID().String()), zap.Error(err))
 			continue
