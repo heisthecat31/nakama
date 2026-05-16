@@ -270,12 +270,13 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 
 			// Collect tickets efficiently - group entries by ticket
 			modestr, _ := candidate[0].GetProperties()["game_mode"].(string)
+			isCombat := modestr == evr.ModeCombatPublic.String()
 			isPublic := modestr == evr.ModeArenaPublic.String() || modestr == evr.ModeCombatPublic.String() || modestr == evr.ModeSocialPublic.String()
 
 			for _, entry := range candidate {
 				ticket := entry.GetTicket()
-				if isPublic {
-					// For public matches, split tickets to allow fair team balancing and consistent age tracking
+				if isCombat {
+					// For combat matches, split tickets to allow fair team balancing
 					ticket = entry.GetPresence().GetUserId()
 				}
 				ticketGroups[ticket] = append(ticketGroups[ticket], entry)
@@ -312,7 +313,7 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 			groupRatings = groupRatings[:0]
 			for _, g := range groups {
 				ticket := g[0].GetTicket()
-				if isPublic {
+				if isCombat {
 					ticket = g[0].GetPresence().GetUserId()
 				}
 				groupRatings = append(groupRatings, ticketRatings[ticket])
@@ -351,7 +352,7 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 					// Original sequential filling (best groups fill blue team first)
 					for _, g := range groups {
 						ticket := g[0].GetTicket()
-						if isPublic {
+						if isCombat {
 							ticket = g[0].GetPresence().GetUserId()
 						}
 						if len(blueTeam)+len(g) <= teamSize {
@@ -375,7 +376,7 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 					// - 8th → Blue
 					for idx, g := range groups {
 						ticket := g[0].GetTicket()
-						if isPublic {
+						if isCombat {
 							ticket = g[0].GetPresence().GetUserId()
 						}
 
