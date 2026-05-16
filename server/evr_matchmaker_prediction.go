@@ -275,8 +275,8 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 
 			for _, entry := range candidate {
 				ticket := entry.GetTicket()
-				if isCombat {
-					// For combat, split tickets to allow fair team balancing
+				if isPublic {
+					// For public matches, split tickets to allow fair team balancing and consistent age tracking
 					ticket = entry.GetPresence().GetUserId()
 				}
 				ticketGroups[ticket] = append(ticketGroups[ticket], entry)
@@ -297,21 +297,8 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 				oldest := float64(time.Now().UTC().Unix())
 				for _, entry := range entries {
 					props := entry.GetProperties()
-					if v, ok := props["timestamp"]; ok {
-						var ts float64
-						switch v := v.(type) {
-						case float64:
-							ts = v
-						case int64:
-							ts = float64(v)
-						case int:
-							ts = float64(v)
-						default:
-							continue
-						}
-						if ts < oldest {
-							oldest = ts
-						}
+					if st, ok := props["timestamp"].(float64); ok && st < oldest {
+						oldest = st
 					}
 				}
 				ticketAge[ticket] = oldest
@@ -326,7 +313,7 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 			groupRatings = groupRatings[:0]
 			for _, g := range groups {
 				ticket := g[0].GetTicket()
-				if isCombat {
+				if isPublic {
 					ticket = g[0].GetPresence().GetUserId()
 				}
 				groupRatings = append(groupRatings, ticketRatings[ticket])
@@ -345,45 +332,15 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 			}
 			for _, g := range groups {
 				ticket := g[0].GetTicket()
-				if isCombat {
+				if isPublic {
 					ticket = g[0].GetPresence().GetUserId()
 				}
 				maps.Copy(divs, ticketDivs[ticket])
 			}
 
-			minTeamSize := 4
-			if v, ok := candidate[0].GetProperties()["min_team_size"]; ok {
-				switch v := v.(type) {
-				case float64:
-					minTeamSize = int(v)
-				case int64:
-					minTeamSize = int(v)
-				case int:
-					minTeamSize = v
-				}
-			}
-
 
 
 			teamSize := len(candidate) / 2
-			if teamSize < minTeamSize {
-				continue
-			}
-
-			// For public, enforce a minimum queue time (60s) for the oldest ticket
-			// unless a 4v4 match or larger is already possible.
-			if isPublic && len(candidate) < 8 {
-				oldestTimestamp := float64(time.Now().UTC().Unix())
-				for _, g := range groups {
-					ticket := g[0].GetPresence().GetUserId()
-					if age := ticketAge[ticket]; age < oldestTimestamp {
-						oldestTimestamp = age
-					}
-				}
-				if time.Now().UTC().Unix()-int64(oldestTimestamp) < 60 {
-					continue
-				}
-			}
 
 			for _, variant := range variants {
 				// Create teams based on variant
@@ -395,7 +352,7 @@ func predictCandidateOutcomesWithConfig(candidates [][]runtime.MatchmakerEntry, 
 					// Original sequential filling (best groups fill blue team first)
 					for _, g := range groups {
 						ticket := g[0].GetTicket()
-						if isCombat {
+						if isPublic {
 							ticket = g[0].GetPresence().GetUserId()
 						}
 						if len(blueTeam)+len(g) <= teamSize {

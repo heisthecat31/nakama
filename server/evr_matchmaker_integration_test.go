@@ -841,3 +841,146 @@ func TestUndersizedMatch_TwoPlayersWithExpiredFailsafe(t *testing.T) {
 		t.Fatalf("expected 2 players, got %d", len(matched[0]))
 	}
 }
+
+// TestUndersizedMatch_Combat1v1AllowedAfterFailsafe verifies that 1v1 (2 players)
+// combat matches (min_team_size=1, min_match=2) ARE matched when undersized rules
+// are satisfied. This is a regression test for the headline Combat fix.
+func TestUndersizedMatch_Combat1v1AllowedAfterFailsafe(t *testing.T) {
+	logger := loggerForTest(t)
+	matchmaker, cleanup := createProcessorTestMatchmaker(t, logger)
+	defer cleanup()
+	wireEvrProcessor(matchmaker, NewRuntimeGoLogger(logger))
+
+	// 1v1 Combat: 2 players.
+	// Since min_team_size=1, min_match=2.
+	// A 1v1 is exactly the minimum size (2 >= 1x2=2).
+	// But it should also respect the 60s queue delay for public matches.
+	for i := range 2 {
+		addIntegrationProcessorTicketWithProps(t, matchmaker, fmt.Sprintf("combat1v1-%02d", i),
+			map[string]string{"game_mode": "echo_combat"},
+			map[string]float64{
+				"failsafe_timeout": 300,
+				"min_team_size":    1,
+				"timestamp":        float64(time.Now().UTC().Unix()) - 61, // 61s ago > 60s gate
+			})
+	}
+
+	matched, _ := runProcessorCycle(matchmaker)
+	if len(matched) != 1 {
+		t.Fatalf("expected 1 match (1v1 Combat, 61s elapsed), got %d", len(matched))
+	}
+	if len(matched[0]) != 2 {
+		t.Fatalf("expected 2 players, got %d", len(matched[0]))
+	}
+}
+
+// TestPublicMatchmaker_CrossGuildPairing verifies that public matchmaking
+// (echo_arena) correctly pairs players from different social lobbies (guilds).
+// This confirms the fix for the "Island Matchmaking" bug.
+func TestPublicMatchmaker_CrossGuildPairing(t *testing.T) {
+	logger := loggerForTest(t)
+	matchmaker, cleanup := createProcessorTestMatchmaker(t, logger)
+	defer cleanup()
+	wireEvrProcessor(matchmaker, NewRuntimeGoLogger(logger))
+
+	// Player 1 in Guild A
+	addIntegrationProcessorTicketWithProps(t, matchmaker, "player-guild-a",
+		map[string]string{
+			"game_mode": "echo_arena",
+			"group_id":  "guild-a-id",
+		}, nil)
+
+	// Player 2 in Guild B
+	addIntegrationProcessorTicketWithProps(t, matchmaker, "player-guild-b",
+		map[string]string{
+			"game_mode": "echo_arena",
+			"group_id":  "guild-b-id",
+		}, nil)
+
+	// Add 6 more players in Guild C to make a full match
+	for i := range 6 {
+		addIntegrationProcessorTicketWithProps(t, matchmaker, fmt.Sprintf("player-guild-c-%d", i),
+			map[string]string{
+				"game_mode": "echo_arena",
+				"group_id":  "guild-c-id",
+			}, nil)
+	}
+
+	matched, _ := runProcessorCycle(matchmaker)
+	if len(matched) != 1 {
+		t.Fatalf("expected 1 match (cross-guild), got %d", len(matched))
+	}
+	if len(matched[0]) != 8 {
+		t.Fatalf("expected 8 players, got %d", len(matched[0]))
+	}
+
+	// Verify both players from different guilds are in the match
+	var foundA, foundB bool
+	for _, entry := range matched[0] {
+		if entry.StringProperties["group_id"] == "guild-a-id" {
+			foundA = true
+		}
+		if entry.StringProperties["group_id"] == "guild-b-id" {
+			foundB = true
+		}
+	}
+	if !foundA || !foundB {
+		t.Fatalf("match missing players from different guilds: foundA=%v, foundB=%v", foundA, foundB)
+	}
+}
+
+func TestUndersizedMatch_Combat1v1WithExpiredFailsafe(t *testing.T) {
+	logger := loggerForTest(t)
+	matchmaker, cleanup := createProcessorTestMatchmaker(t, logger)
+	defer cleanup()
+	wireEvrProcessor(matchmaker, NewRuntimeGoLogger(logger))
+
+	ticketTime := float64(time.Now().UTC().Unix()) - 120
+
+	for i := range 2 {
+		addIntegrationProcessorTicketWithProps(t, matchmaker, fmt.Sprintf("combat1v1-expired-%02d", i),
+			map[string]string{"game_mode": "echo_combat"},
+			map[string]float64{
+				"failsafe_timeout": 0,
+				"min_team_size":    3,
+				"max_team_size":    5,
+				"max_count":        10,
+				"count_multiple":   2,
+				"timestamp":        ticketTime,
+			})
+	}
+
+	matched, _ := runProcessorCycle(matchmaker)
+	if len(matched) != 1 {
+		t.Fatalf("expected 1 match (2 players in combat, failsafe bypassed), got %d", len(matched))
+	}
+	if len(matched[0]) != 2 {
+		t.Fatalf("expected 2 players, got %d", len(matched[0]))
+	}
+}
+
+func TestIntegrationProcessorCrossGuildPublicMatchmaking(t *testing.T) {
+	logger := loggerForTest(t)
+	matchmaker, cleanup := createProcessorTestMatchmaker(t, logger)
+	defer cleanup()
+	wireEvrProcessor(matchmaker, NewRuntimeGoLogger(logger))
+
+	addIntegrationProcessorTicketWithProps(t, matchmaker, "guildA", map[string]string{
+		"game_mode": "echo_combat",
+		"group_id":  "guild-A",
+	}, map[string]float64{
+		"timestamp": float64(time.Now().UTC().Unix()),
+	})
+
+	addIntegrationProcessorTicketWithProps(t, matchmaker, "guildB", map[string]string{
+		"game_mode": "echo_combat",
+		"group_id":  "guild-B",
+	}, map[string]float64{
+		"timestamp": float64(time.Now().UTC().Unix()),
+	})
+
+	matched, _ := runProcessorCycle(matchmaker)
+	if len(matched) != 1 {
+		t.Fatalf("expected 1 match (cross-guild players should match in public mode), got %d", len(matched))
+	}
+}

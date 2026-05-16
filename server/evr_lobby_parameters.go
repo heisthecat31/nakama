@@ -592,11 +592,7 @@ func (p *LobbySessionParameters) BackfillSearchQuery(includeMMR bool, includeMax
 
 	minStartTime := p.MatchmakingTimestamp.UTC().Add(-time.Duration(MatchStartTimeMinimumAgeSecs) * time.Second).Format(time.RFC3339Nano)
 
-	groupID := p.GroupID
-	if p.Mode == evr.ModeArenaPublic || p.Mode == evr.ModeCombatPublic || p.Mode == evr.ModeSocialPublic {
-		groupID = uuid.Nil
-	}
-
+	groupID := p.GetMatchmakingGroupID()
 	qparts := []string{
 		"+label.open:T",
 		fmt.Sprintf("+label.mode:%s", p.Mode.String()),
@@ -745,11 +741,7 @@ func (p *LobbySessionParameters) FromMatchmakerEntry(entry *MatchmakerEntry) {
 
 func (p *LobbySessionParameters) MatchmakingParameters(ticketParams *MatchmakingTicketParameters) (string, map[string]string, map[string]float64) {
 
-	groupID := p.GroupID
-	if p.Mode == evr.ModeArenaPublic || p.Mode == evr.ModeCombatPublic || p.Mode == evr.ModeSocialPublic {
-		groupID = uuid.Nil
-	}
-
+	groupID := p.GetMatchmakingGroupID()
 	submissionTime := p.MatchmakingTimestamp.UTC().Format(time.RFC3339)
 	stringProperties := map[string]string{
 		"game_mode":              p.Mode.String(),
@@ -885,19 +877,18 @@ func (p *LobbySessionParameters) MatchmakingParameters(ticketParams *Matchmaking
 }
 
 func (p LobbySessionParameters) MatchmakingStream() PresenceStream {
-	groupID := p.GroupID
-	if p.Mode == evr.ModeArenaPublic || p.Mode == evr.ModeCombatPublic || p.Mode == evr.ModeSocialPublic {
-		groupID = uuid.Nil
-	}
-	return PresenceStream{Mode: StreamModeMatchmaking, Subject: groupID}
+	return PresenceStream{Mode: StreamModeMatchmaking, Subject: p.GetMatchmakingGroupID()}
 }
 
 func (p LobbySessionParameters) GuildGroupStream() PresenceStream {
-	groupID := p.GroupID
+	return PresenceStream{Mode: StreamModeGuildGroup, Subject: p.GetMatchmakingGroupID(), Label: p.Mode.String()}
+}
+
+func (p LobbySessionParameters) GetMatchmakingGroupID() uuid.UUID {
 	if p.Mode == evr.ModeArenaPublic || p.Mode == evr.ModeCombatPublic || p.Mode == evr.ModeSocialPublic {
-		groupID = uuid.Nil
+		return uuid.Nil
 	}
-	return PresenceStream{Mode: StreamModeGuildGroup, Subject: groupID, Label: p.Mode.String()}
+	return p.GroupID
 }
 
 func (p LobbySessionParameters) PresenceMeta() PresenceMeta {

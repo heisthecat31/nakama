@@ -356,16 +356,9 @@ func isUndersizedMatch(candidate []runtime.MatchmakerEntry) bool {
 		return true
 	}
 
-	minTeamSize := 4.0
-	if v, ok := candidate[0].GetProperties()["min_team_size"]; ok {
-		switch v := v.(type) {
-		case float64:
-			minTeamSize = v
-		case int64:
-			minTeamSize = float64(v)
-		case int:
-			minTeamSize = float64(v)
-		}
+	minTeamSize, ok := candidate[0].GetProperties()["min_team_size"].(float64)
+	if !ok || minTeamSize <= 0 {
+		minTeamSize = 4.0
 	}
 
 	minMatchSize := int(minTeamSize) * 2
@@ -373,17 +366,7 @@ func isUndersizedMatch(candidate []runtime.MatchmakerEntry) bool {
 		return false
 	}
 
-	failsafeTimeout := 0.0
-	if v, ok := candidate[0].GetProperties()["failsafe_timeout"]; ok {
-		switch v := v.(type) {
-		case float64:
-			failsafeTimeout = v
-		case int64:
-			failsafeTimeout = float64(v)
-		case int:
-			failsafeTimeout = float64(v)
-		}
-	}
+	failsafeTimeout, _ := candidate[0].GetProperties()["failsafe_timeout"].(float64)
 	if failsafeTimeout <= 0 {
 		return false
 	}
@@ -391,20 +374,19 @@ func isUndersizedMatch(candidate []runtime.MatchmakerEntry) bool {
 	now := float64(time.Now().UTC().Unix())
 	oldestTimestamp := now
 	for _, entry := range candidate {
-		if v, ok := entry.GetProperties()["timestamp"]; ok {
-			var ts float64
-			switch v := v.(type) {
-			case float64:
-				ts = v
-			case int64:
-				ts = float64(v)
-			case int:
-				ts = float64(v)
-			default:
-				continue
-			}
-			if ts < oldestTimestamp {
-				oldestTimestamp = ts
+		if ts, ok := entry.GetProperties()["timestamp"].(float64); ok && ts < oldestTimestamp {
+			oldestTimestamp = ts
+		}
+	}
+
+	// For public matches smaller than a 4v4, enforce a 60-second minimum wait
+	// to allow more players to join, regardless of the failsafe timeout.
+	// This is bypassed if the failsafe is explicitly set to zero (e.g. in tests).
+	if len(candidate) < 8 {
+		modestr, _ := candidate[0].GetProperties()["game_mode"].(string)
+		if modestr == evr.ModeArenaPublic.String() || modestr == evr.ModeCombatPublic.String() || modestr == evr.ModeSocialPublic.String() {
+			if now-oldestTimestamp < 60 {
+				return true
 			}
 		}
 	}
