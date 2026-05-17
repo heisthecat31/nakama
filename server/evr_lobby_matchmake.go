@@ -219,7 +219,16 @@ func (p *EvrPipeline) lobbyMatchMakeWithFallback(ctx context.Context, logger *za
 			// On first fallback: relax Nakama-level count constraints.
 			if fallbackCount == 1 {
 				ticketConfig.MinCount = 2
-				ticketConfig.MaxCount = 8
+				switch lobbyParams.Mode {
+				case evr.ModeArenaPublic:
+					ticketConfig.MaxCount = 8
+				case evr.ModeCombatPublic:
+					ticketConfig.MaxCount = 10
+				case evr.ModeSocialPublic:
+					ticketConfig.MaxCount = 12
+				default:
+					ticketConfig.MaxCount = 16
+				}
 			}
 
 			// Progressively reduce the failsafe timeout so isUndersizedMatch
